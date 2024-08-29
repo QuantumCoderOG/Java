@@ -5,6 +5,7 @@ public abstract class Shape implements Cloneable {
 
     abstract void draw();
 
+    @Override
     public Object clone() {
         Object clone = null;
         try {
