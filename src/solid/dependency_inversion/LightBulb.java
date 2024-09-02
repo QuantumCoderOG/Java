@@ -1,0 +1,11 @@
+package src.solid.dependency_inversion;
+
+public class LightBulb {
+    public void turnOn() {
+        System.out.println("LightBulb turned on");
+    }
+
+    public void turnOff() {
+        System.out.println("LightBulb turned off");
+    }
+}
