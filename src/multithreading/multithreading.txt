@@ -1,0 +1,801 @@
+Multithreading is a vast and critical area in Java, especially for high-performance and concurrent applications.
+ Below is a comprehensive guide covering all important aspects of multithreading, including synchronization, locks, thread communication,
+  and the Executor Service. I'll also provide detailed explanations and Java interview questions related to these topics.
+
+Table of Contents
+Thread Basics
+Thread Synchronization
+Locks in Java
+Thread Communication
+Executor Service and Thread Pools
+Advanced Multithreading Concepts
+Multithreading Interview Questions and Answers
+
+
+1. Thread Basics
+Creating Threads in Java
+Extending the Thread Class:
+
+
+
+class MyThread extends Thread {
+    public void run() {
+        System.out.println("Thread " + Thread.currentThread().getId() + " is running");
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        MyThread t1 = new MyThread();
+        t1.start();
+    }
+}
+
+
+Implementing the Runnable Interface:
+
+
+class MyRunnable implements Runnable {
+    public void run() {
+        System.out.println("Thread " + Thread.currentThread().getId() + " is running");
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Thread t1 = new Thread(new MyRunnable());
+        t1.start();
+    }
+}
+
+
+Thread Lifecycle
+New: Thread is created but not yet started.
+Runnable: Thread is ready to run and waiting for CPU.
+Running: Thread is executing.
+Blocked: Thread is blocked and waiting for a resource.
+Terminated: Thread has completed its execution.
+2. Thread Synchronization
+Why Synchronization is Needed
+Synchronization is required when multiple threads access shared resources, such as variables, objects, or files, to prevent data inconsistency and race conditions.
+
+synchronized Keyword
+The synchronized keyword in Java can be used to synchronize methods or blocks of code.
+
+Synchronized Method
+java
+Copy code
+class Counter {
+    private int count = 0;
+
+    public synchronized void increment() {
+        count++;
+    }
+
+    public int getCount() {
+        return count;
+    }
+}
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        Counter counter = new Counter();
+
+        Thread t1 = new Thread(() -> {
+            for (int i = 0; i < 1000; i++) {
+                counter.increment();
+            }
+        });
+
+        Thread t2 = new Thread(() -> {
+            for (int i = 0; i < 1000; i++) {
+                counter.increment();
+            }
+        });
+
+        t1.start();
+        t2.start();
+
+        t1.join();
+        t2.join();
+
+        System.out.println("Count: " + counter.getCount()); // Expected output: 2000
+    }
+}
+Synchronized Block
+java
+Copy code
+class Counter {
+    private int count = 0;
+    private final Object lock = new Object();
+
+    public void increment() {
+        synchronized (lock) {
+            count++;
+        }
+    }
+
+    public int getCount() {
+        return count;
+    }
+}
+Static Synchronization
+Static methods can also be synchronized using the synchronized keyword. The lock is on the class level, not the instance level.
+
+java
+Copy code
+class Counter {
+    private static int count = 0;
+
+    public static synchronized void increment() {
+        count++;
+    }
+
+    public static int getCount() {
+        return count;
+    }
+}
+Deadlock
+A deadlock occurs when two or more threads are blocked forever, waiting for each other. This typically happens when two threads have circular dependencies on locks.
+
+Example of Deadlock
+java
+Copy code
+class A {
+    synchronized void methodA(B b) {
+        System.out.println("Thread 1: Lock on A");
+        b.last();
+    }
+
+    synchronized void last() {
+        System.out.println("Inside A.last()");
+    }
+}
+
+class B {
+    synchronized void methodB(A a) {
+        System.out.println("Thread 2: Lock on B");
+        a.last();
+    }
+
+    synchronized void last() {
+        System.out.println("Inside B.last()");
+    }
+}
+
+public class DeadlockDemo {
+    public static void main(String[] args) {
+        final A a = new A();
+        final B b = new B();
+
+        Thread t1 = new Thread(() -> a.methodA(b));
+        Thread t2 = new Thread(() -> b.methodB(a));
+
+        t1.start();
+        t2.start();
+    }
+}
+In this example, t1 holds the lock on A and waits for the lock on B, while t2 holds the lock on B and waits for the lock on A. This results in a deadlock.
+
+3. Locks in Java
+Java provides more advanced mechanisms for synchronization, such as Lock and ReentrantLock.
+
+Lock Interface and ReentrantLock Class
+ReentrantLock is a concrete implementation of the Lock interface and provides extended locking capabilities.
+
+Basic Usage of ReentrantLock
+java
+Copy code
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+class Counter {
+    private int count = 0;
+    private final Lock lock = new ReentrantLock();
+
+    public void increment() {
+        lock.lock();  // Acquire the lock
+        try {
+            count++;
+        } finally {
+            lock.unlock();  // Release the lock
+        }
+    }
+
+    public int getCount() {
+        return count;
+    }
+}
+
+public class ReentrantLockExample {
+    public static void main(String[] args) throws InterruptedException {
+        Counter counter = new Counter();
+
+        Thread t1 = new Thread(() -> {
+            for (int i = 0; i < 1000; i++) {
+                counter.increment();
+            }
+        });
+
+        Thread t2 = new Thread(() -> {
+            for (int i = 0; i < 1000; i++) {
+                counter.increment();
+            }
+        });
+
+        t1.start();
+        t2.start();
+
+        t1.join();
+        t2.join();
+
+        System.out.println("Count: " + counter.getCount()); // Expected output: 2000
+    }
+}
+Fairness in Lock
+ReentrantLock can be constructed with a fairness parameter. When set to true, it ensures that threads acquire the lock in the order they requested it.
+
+java
+Copy code
+Lock lock = new ReentrantLock(true);  // Fair lock
+tryLock()
+tryLock() attempts to acquire the lock without waiting indefinitely.
+
+java
+Copy code
+if (lock.tryLock()) {
+    try {
+        // Critical section
+    } finally {
+        lock.unlock();
+    }
+} else {
+    // Failed to acquire the lock
+}
+4. Thread Communication
+Thread communication involves coordinating the execution of multiple threads. Java provides mechanisms such as wait(), notify(), and notifyAll().
+
+wait(), notify(), and notifyAll()
+wait(): Causes the current thread to wait until another thread calls notify() or notifyAll() on the same object.
+notify(): Wakes up a single thread that is waiting on the object's monitor.
+notifyAll(): Wakes up all threads that are waiting on the object's monitor.
+Example of wait() and notify()
+java
+Copy code
+class SharedResource {
+    private boolean available = false;
+
+    public synchronized void produce() throws InterruptedException {
+        while (available) {
+            wait();
+        }
+        System.out.println("Produced");
+        available = true;
+        notify();  // Notify the consumer
+    }
+
+    public synchronized void consume() throws InterruptedException {
+        while (!available) {
+            wait();
+        }
+        System.out.println("Consumed");
+        available = false;
+        notify();  // Notify the producer
+    }
+}
+
+public class WaitNotifyExample {
+    public static void main(String[] args) {
+        SharedResource resource = new SharedResource();
+
+        Thread producer = new Thread(() -> {
+            try {
+                for (int i = 0; i < 5; i++) {
+                    resource.produce();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+        Thread consumer = new Thread(() -> {
+            try {
+                for (int i = 0; i < 5; i++) {
+                    resource.consume();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+        producer.start();
+        consumer.start();
+    }
+}
+Explanation:
+
+The producer thread produces an item, then waits if the item is already available.
+The consumer thread consumes the item and waits if the item is not available.
+notify() and wait() ensure that only one thread is working at a time.
+5. Executor Service and Thread Pools
+Introduction to Executor Service
+The ExecutorService framework is a higher-level replacement for working directly with threads. It provides thread pooling, scheduling, and more flexible thread management.
+
+Creating a Thread Pool
+java
+Copy code
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class ExecutorServiceExample {
+    public static void main(String[] args) {
+        ExecutorService executor = Executors.newFixedThreadPool(2); // Creating a pool of 2 threads
+
+        for (int i = 0; i < 5; i++) {
+            Runnable worker = new WorkerThread("" + i);
+            executor.execute(worker);  // Calling execute method of ExecutorService
+        }
+
+        executor.shutdown();  // Initiates an orderly shutdown
+
+        while (!executor.isTerminated()) {
+            // Wait until all threads are finished
+        }
+
+        System.out.println("Finished all threads");
+    }
+}
+
+class WorkerThread implements Runnable {
+    private String command;
+
+    public WorkerThread(String s) {
+        this.command = s;
+    }
+
+    @Override
+    public void run() {
+        System.out.println(Thread.currentThread().getName() + " Start. Command = " + command);
+        processCommand();
+        System.out.println(Thread.currentThread().getName() + " End.");
+    }
+
+    private void processCommand() {
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+Explanation:
+
+Executors.newFixedThreadPool(2): Creates a thread pool with 2 threads.
+executor.execute(worker): Submits the task for execution.
+executor.shutdown(): Initiates an orderly shutdown, preventing new tasks from being submitted.
+Scheduling Tasks with ScheduledExecutorService
+You can schedule tasks to run after a delay or periodically using ScheduledExecutorService.
+
+java
+Copy code
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+public class ScheduledExecutorExample {
+    public static void main(String[] args) {
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+        Runnable task = () -> System.out.println("Scheduled Task: " + System.currentTimeMillis());
+
+        scheduler.scheduleAtFixedRate(task, 2, 3, TimeUnit.SECONDS);
+    }
+}
+Explanation:
+
+scheduleAtFixedRate: Schedules the task to run after an initial delay of 2 seconds and then every 3 seconds.
+6. Advanced Multithreading Concepts
+Callable and Future
+Callable is similar to Runnable but can return a result and throw a checked exception.
+
+java
+Copy code
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+public class CallableFutureExample {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        Callable<Integer> task = () -> {
+            int sum = 0;
+            for (int i = 0; i < 10; i++) {
+                sum += i;
+            }
+            return sum;
+        };
+
+        Future<Integer> future = executor.submit(task);
+
+        System.out.println("Result of Callable: " + future.get()); // waits for the result
+
+        executor.shutdown();
+    }
+}
+Explanation:
+
+Callable<Integer>: A task that returns an Integer result.
+Future<Integer>: Represents the result of the Callable task, allowing the result to be retrieved using get().
+Fork/Join Framework
+The Fork/Join framework is designed for work that can be broken into smaller tasks and processed in parallel.
+
+java
+Copy code
+import java.util.concurrent.RecursiveTask;
+import java.util.concurrent.ForkJoinPool;
+
+class SumTask extends RecursiveTask<Integer> {
+    private int start, end;
+
+    public SumTask(int start, int end) {
+        this.start = start;
+        this.end = end;
+    }
+
+    @Override
+    protected Integer compute() {
+        if (end - start <= 10) {
+            int sum = 0;
+            for (int i = start; i <= end; i++) {
+                sum += i;
+            }
+            return sum;
+        } else {
+            int mid = (start + end) / 2;
+            SumTask leftTask = new SumTask(start, mid);
+            SumTask rightTask = new SumTask(mid + 1, end);
+
+            leftTask.fork(); // asynchronously execute left task
+            int rightResult = rightTask.compute();
+            int leftResult = leftTask.join(); // wait for left task to complete
+
+            return leftResult + rightResult;
+        }
+    }
+}
+
+public class ForkJoinExample {
+    public static void main(String[] args) {
+        ForkJoinPool pool = new ForkJoinPool();
+
+        SumTask task = new SumTask(1, 100);
+        int result = pool.invoke(task);
+
+        System.out.println("Sum from 1 to 100: " + result);
+    }
+}
+Explanation:
+
+RecursiveTask<Integer>: A task that returns an Integer result.
+fork(): Asynchronously executes a task.
+join(): Waits for a task to complete and returns its result.
+7. Multithreading Interview Questions and Answers
+Basics and Synchronization
+What is the difference between Thread and Runnable?
+
+Answer: Thread is a class that represents a thread of execution, while Runnable is an interface that defines a single method run(), which contains the code to be executed by a thread. Implementing Runnable is preferred when you need to implement multiple inheritance or reuse the same instance in multiple threads.
+What is a volatile variable in Java?
+
+Answer: A volatile variable in Java is a variable that is read from and written to the main memory, ensuring visibility of changes across threads. It is used to prevent issues with thread-local caching and visibility of shared variables.
+Explain the use of the synchronized keyword in Java.
+
+Answer: The synchronized keyword in Java is used to ensure that only one thread at a time can execute a particular block of code or method. It is used to prevent thread interference and ensure thread safety when accessing shared resources.
+Locks and Advanced Concepts
+What is the difference between synchronized and ReentrantLock?
+
+Answer: Both synchronized and ReentrantLock are used for synchronization, but ReentrantLock offers more advanced features like fairness, the ability to interrupt threads waiting for a lock, and the ability to try acquiring a lock with tryLock(). ReentrantLock is more flexible but requires explicit lock and unlock calls.
+What is a deadlock? How can it be prevented?
+
+Answer: A deadlock occurs when two or more threads are blocked forever, waiting for each other. It can be prevented by avoiding circular dependencies, using a lock hierarchy, or using timeouts with locks.
+What is the ThreadLocal class?
+
+Answer: ThreadLocal provides thread-local variables, where each thread accessing such a variable has its own, independently initialized copy of the variable. It is used to avoid synchronization issues when thread-specific data is needed.
+Thread Pools and Executors
+What is the difference between execute() and submit() methods in ExecutorService?
+
+Answer: execute() is used to submit a Runnable task for execution, and it does not return a result. submit() can accept both Runnable and Callable tasks, and it returns a Future object representing the task’s result or status.
+What are the different types of thread pools provided by the Executors class?
+
+Answer:
+newFixedThreadPool(int n): A pool with a fixed number of threads.
+newCachedThreadPool(): A pool with a dynamic number of threads, growing and shrinking as needed.
+newSingleThreadExecutor(): A pool with a single thread.
+newScheduledThreadPool(int n): A pool for scheduling tasks with a fixed number of threads.
+What is the Fork/Join framework, and when would you use it?
+
+Answer: The Fork/Join framework is used to execute tasks that can be divided into smaller tasks and processed in parallel. It is used in situations where you need to perform a recursive divide-and-conquer algorithm, such as parallel sorting or parallel searching.
+Communication and Concurrency
+Explain the use of wait(), notify(), and notifyAll() methods.
+
+Answer:
+wait(): Causes the current thread to wait until another thread calls notify() or notifyAll() on the same object.
+notify(): Wakes up one waiting thread.
+notifyAll(): Wakes up all waiting threads. These methods are used for thread communication and must be called from synchronized blocks or methods.
+What is the difference between wait() and sleep() methods?
+
+Answer:
+wait(): Releases the lock on the object and pauses the thread until notify() or notifyAll() is called. It must be called within a synchronized context.
+sleep(): Pauses the thread for a specified time but does not release the lock. It can be called from any context.
+This guide covers a broad range of topics in multithreading in Java, from basic concepts to advanced topics like locks, thread communication, and thread pools. The interview questions provided should help solidify your understanding and prepare you for technical discussions on multithreading in Java.
+
+
+
+
+
+
+You said:
+Count down latch example as well
+ChatGPT said:
+ChatGPT
+CountDownLatch in Java
+CountDownLatch is a synchronization aid that allows one or more threads to wait until a set of operations being performed in other threads completes. It's typically used when you want one thread to wait for several other threads to complete their tasks before proceeding.
+
+How CountDownLatch Works
+Initialization: A CountDownLatch is initialized with a given count (the number of operations to wait for).
+Counting Down: Each time an operation is completed, the countDown() method is called, which decreases the count by one.
+Waiting: The await() method causes the current thread to wait until the count reaches zero.
+Once the count reaches zero, all waiting threads are released.
+
+Example of CountDownLatch
+Let's say we have a scenario where a main thread needs to wait for three worker threads to complete their tasks before continuing.
+
+java
+Copy code
+import java.util.concurrent.CountDownLatch;
+
+class Worker extends Thread {
+    private int delay;
+    private CountDownLatch latch;
+
+    public Worker(int delay, CountDownLatch latch, String name) {
+        super(name);
+        this.delay = delay;
+        this.latch = latch;
+    }
+
+    @Override
+    public void run() {
+        try {
+            Thread.sleep(delay);
+            System.out.println(Thread.currentThread().getName() + " finished work");
+            latch.countDown(); // Decrement the count of the latch
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+public class CountDownLatchExample {
+    public static void main(String[] args) {
+        // CountDownLatch initialized with a count of 3
+        CountDownLatch latch = new CountDownLatch(3);
+
+        // Create and start three worker threads
+        Worker worker1 = new Worker(1000, latch, "Worker-1");
+        Worker worker2 = new Worker(2000, latch, "Worker-2");
+        Worker worker3 = new Worker(3000, latch, "Worker-3");
+
+        worker1.start();
+        worker2.start();
+        worker3.start();
+
+        try {
+            latch.await();  // Main thread waits here until countDown() is called three times
+            System.out.println("All workers have finished, main thread proceeding...");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+Explanation of the Example
+Initialization:
+
+A CountDownLatch is created with a count of 3, which means the main thread will wait until three countDown() calls are made.
+Worker Threads:
+
+Three worker threads (Worker-1, Worker-2, and Worker-3) are created. Each worker thread sleeps for a different amount of time to simulate different task durations.
+After completing their "work" (i.e., after sleeping for the specified duration), each thread calls latch.countDown(), which decrements the latch's count.
+Main Thread:
+
+The main thread calls latch.await(), which causes it to wait until the latch's count reaches zero. This happens only after all three worker threads have finished their work and called countDown().
+Completion:
+
+Once the count reaches zero, the main thread is released from the await() call, and it proceeds with the next operation.
+Real-World Use Cases
+CountDownLatch is particularly useful in scenarios like:
+
+Starting a set of tasks in parallel and waiting for them to finish before moving on.
+Simulating a scenario where you need to ensure that multiple services or resources are initialized before starting an application.
+Testing scenarios where you need to wait for multiple asynchronous operations to complete before asserting results.
+This simple yet powerful synchronization mechanism helps manage the complexity of coordinating multiple threads, making it a valuable tool in concurrent programming.
+
+
+
+
+
+
+You said:
+Compelteble future async
+ChatGPT said:
+ChatGPT
+CompletableFuture in Java
+CompletableFuture is a versatile and powerful feature introduced in Java 8, designed to handle asynchronous programming more gracefully than traditional threads or Future. It allows for the creation, combination, and chaining of tasks that may run asynchronously, making it a key tool for concurrent programming.
+
+Key Concepts of CompletableFuture
+Asynchronous Computation: Run tasks asynchronously, without blocking the main thread.
+Chaining: Chain multiple computations together, where the next step can depend on the previous one.
+Combining: Combine multiple tasks and their results.
+Exception Handling: Handle exceptions in an asynchronous pipeline.
+Creating a CompletableFuture
+Example: Running a Task Asynchronously
+java
+Copy code
+import java.util.concurrent.CompletableFuture;
+
+public class CompletableFutureExample {
+    public static void main(String[] args) {
+        // Run a task asynchronously
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(1000);
+                System.out.println("Asynchronous task completed!");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+        // Block and wait for the task to complete
+        future.join();
+    }
+}
+Explanation
+runAsync: Runs a Runnable task asynchronously. It returns a CompletableFuture<Void> since the task does not return a result.
+join: Waits for the task to complete. Similar to get(), but throws an unchecked exception if the computation fails.
+Using thenApply, thenAccept, and thenRun
+CompletableFuture allows chaining operations that are triggered when the asynchronous task completes.
+
+Example: Transforming a Result with thenApply
+java
+Copy code
+import java.util.concurrent.CompletableFuture;
+
+public class CompletableFutureApplyExample {
+    public static void main(String[] args) {
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            try {
+                Thread.sleep(1000);
+                return "Hello";
+            } catch (InterruptedException e) {
+                throw new IllegalStateException(e);
+            }
+        }).thenApply(result -> result + " World");
+
+        // Block and get the result
+        String greeting = future.join();
+        System.out.println(greeting);  // Outputs "Hello World"
+    }
+}
+Explanation
+supplyAsync: Runs a Supplier task asynchronously and returns its result.
+thenApply: Transforms the result of a CompletableFuture when it completes.
+Combining Multiple CompletableFuture Instances
+Example: Combining Two Independent Futures
+java
+Copy code
+import java.util.concurrent.CompletableFuture;
+
+public class CompletableFutureCombineExample {
+    public static void main(String[] args) {
+        CompletableFuture<Integer> future1 = CompletableFuture.supplyAsync(() -> 20);
+        CompletableFuture<Integer> future2 = CompletableFuture.supplyAsync(() -> 22);
+
+        CompletableFuture<Integer> combinedFuture = future1.thenCombine(future2, Integer::sum);
+
+        System.out.println("Combined Result: " + combinedFuture.join());  // Outputs 42
+    }
+}
+Explanation
+thenCombine: Combines two independent CompletableFuture instances once they both complete. The result of the combination is provided to the supplied function (Integer::sum).
+Handling Exceptions
+CompletableFuture also allows you to handle exceptions that occur during asynchronous execution.
+
+Example: Exception Handling with exceptionally
+java
+Copy code
+import java.util.concurrent.CompletableFuture;
+
+public class CompletableFutureExceptionExample {
+    public static void main(String[] args) {
+        CompletableFuture<Integer> future = CompletableFuture.supplyAsync(() -> {
+            if (Math.random() > 0.5) {
+                throw new RuntimeException("Failed");
+            }
+            return 42;
+        }).exceptionally(ex -> {
+            System.out.println("Exception: " + ex.getMessage());
+            return 0;
+        });
+
+        System.out.println("Result: " + future.join());
+    }
+}
+Explanation
+exceptionally: Allows you to handle exceptions that occur during the asynchronous computation. It returns a fallback value if an exception is thrown.
+Running Multiple Futures in Parallel
+Example: Running Multiple Futures with allOf
+java
+Copy code
+import java.util.concurrent.CompletableFuture;
+
+public class CompletableFutureAllOfExample {
+    public static void main(String[] args) {
+        CompletableFuture<Void> future1 = CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(1000);
+                System.out.println("Task 1");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+        CompletableFuture<Void> future2 = CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(2000);
+                System.out.println("Task 2");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+        CompletableFuture<Void> future3 = CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(3000);
+                System.out.println("Task 3");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+        // Run all futures in parallel and wait for all to complete
+        CompletableFuture<Void> allOf = CompletableFuture.allOf(future1, future2, future3);
+        allOf.join();
+
+        System.out.println("All tasks completed!");
+    }
+}
+Explanation
+allOf: Waits for all the provided CompletableFuture instances to complete. Useful when you have multiple tasks to execute in parallel and need to wait for all of them.
+Real-World Use Cases of CompletableFuture
+Asynchronous Web Services: Handling requests in a non-blocking way, improving throughput.
+Parallel Data Processing: Running data processing tasks in parallel and combining the results.
+Event-Driven Systems: Building systems where events trigger asynchronous tasks.
+Interview Questions Related to CompletableFuture
+What is CompletableFuture and how does it improve upon Future?
+
+Answer: CompletableFuture is a more advanced version of Future that allows non-blocking calls, chaining of dependent actions, and better handling of asynchronous operations. Unlike Future, it provides methods for combining multiple futures and handling exceptions.
+What are the key differences between thenApply and thenCompose?
+
+Answer: thenApply is used when the next operation depends on the result of the previous operation. thenCompose is used when the next operation itself returns a CompletableFuture. thenCompose flattens the nested CompletableFuture.
+How do you handle exceptions in a CompletableFuture chain?
+
+Answer: Exceptions in a CompletableFuture can be handled using methods like exceptionally, handle, or whenComplete, depending on whether you need to recover from the exception or simply log it.
+Can CompletableFuture be used with a custom Executor?
+
+Answer: Yes, CompletableFuture can be executed with a custom Executor by passing the Executor to methods like runAsync or supplyAsync. This allows you to control the thread pool or execution context.
+What is the difference between allOf and anyOf in CompletableFuture?
+
+Answer: allOf waits for all provided CompletableFuture instances to complete, while anyOf completes as soon as any of the provided futures complete, returning that result.
+CompletableFuture is a crucial part of modern Java for writing clean, non-blocking, and efficient asynchronous code.
