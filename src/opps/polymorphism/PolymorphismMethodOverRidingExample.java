@@ -4,6 +4,8 @@ public class PolymorphismMethodOverRidingExample {
     public static void main(String[] args) {
         Animal myAnimal = new Dog(); // Polymorphism
         myAnimal.sound(); // Dog's sound method is called
+        Dog dog = new Dog();
+        dog.sound(); // Dog's sound method is called
     }
 
 //    Polymorphism allows methods to do different things based on the object

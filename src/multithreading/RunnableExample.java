@@ -4,10 +4,14 @@ public class RunnableExample {
     public static void main(String[] args) {
         MyRunnable runnable = new MyRunnable();
         Thread thread1 = new Thread(runnable);
+        System.out.println(thread1.getState());
         Thread thread2 = new Thread(runnable);
 
         thread1.start(); // Start the first thread
+        System.out.println(thread1.getState());
         thread2.start(); // Start the second thread
+
+        System.out.println(thread1.getState());
     }
 
 //    Explanation:
