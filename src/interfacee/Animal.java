@@ -13,4 +13,5 @@ interface Animal {
     static void sleep() {
         System.out.println("This animal sleeps at night.");
     }
+
 }

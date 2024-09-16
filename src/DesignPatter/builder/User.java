@@ -22,6 +22,10 @@ public class User {
     public int getAge() {
         return age;
     }
+    public static UserBuilder builder() {
+        return new UserBuilder();
+    }
+
 
     public static class UserBuilder {
         private String firstName;
